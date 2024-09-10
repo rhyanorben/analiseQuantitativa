@@ -1,12 +1,11 @@
-import sys
-import pandas as pd
-import matplotlib.pyplot as plt
-from math import exp, factorial
+import sys #Utilizada para manipular o ambiente
+import pandas as pd #Utilizado para os dataframes
+import matplotlib.pyplot as plt #Utilizada pra gráficos
+from math import exp, factorial #Utilizada para operações matemáticas
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, 
                              QLineEdit, QFileDialog, QMessageBox, QVBoxLayout, 
-                             QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox)
-from PyQt5.QtCore import Qt
-from matplotlib.ticker import MaxNLocator
+                             QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox) #Utilizado para a interface
+from matplotlib.ticker import MaxNLocator #Formatação dos gráficos
 
 # Função para calcular a probabilidade de k gols usando a distribuição de Poisson
 def poisson_probability(lambd, k):
@@ -23,7 +22,7 @@ def calcular_poisson(media_gols):
 class AnalysisApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Análise Quantitativa de Rodadas")
+        self.setWindowTitle("Análise Under/Over Gols")
         self.setGeometry(100, 100, 800, 600)
 
         self.df = None
@@ -153,9 +152,16 @@ class AnalysisApp(QMainWindow):
     def plot_poisson_distribution(self, selected_team, media_gols):
         try:
             probabilities = calcular_poisson(media_gols)
+
+            def my_autopct(pct):
+                return f'{pct:.1f}%'
+
             plt.figure(figsize=(10, 5))
-            plt.pie(probabilities, labels=[f'{i} gols: {p:.1%}' for i, p in enumerate(probabilities)],
-                    autopct='%1.1f%%', startangle=140, colors=plt.cm.Paired(range(len(probabilities))))
+            plt.pie(probabilities, 
+                    labels=[f'{i} gols' for i, _ in enumerate(probabilities)],
+                    autopct=my_autopct,
+                    startangle=140, 
+                    colors=plt.cm.Paired(range(len(probabilities))))
             plt.title(f"Distribuição de Probabilidades de Gols para {selected_team} (Poisson)")
             plt.show()
         except Exception as e:
