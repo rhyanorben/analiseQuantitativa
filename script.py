@@ -1,138 +1,187 @@
-import sys #Utilizada para manipular o ambiente
-import pandas as pd #Utilizado para os dataframes
-import matplotlib.pyplot as plt #Utilizada pra gráficos
-from math import exp, factorial #Utilizada para operações matemáticas
+import sys  # Utilizada para manipular o ambiente
+import pandas as pd  # Utilizado para dataframes
+import matplotlib.pyplot as plt  # Utilizada para gráficos
+from math import exp, factorial  # Utilizada para operações matemáticas
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel, 
                              QLineEdit, QFileDialog, QMessageBox, QVBoxLayout, 
-                             QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox) #Utilizado para a interface
-from matplotlib.ticker import MaxNLocator #Formatação dos gráficos
+                             QWidget, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QTabWidget, QTextEdit, QCheckBox)  # Utilizado para a interface gráfica
+from matplotlib.ticker import MaxNLocator  # Formatação dos gráficos
 
 # Função para calcular a probabilidade de k gols usando a distribuição de Poisson
 def poisson_probability(lambd, k):
-    return (lambd ** k * exp(-lambd)) / factorial(k)
-    #Lambd = Média de ocorrências no período (no intervalo de 5 jogos, nesse caso)
-    #k = Número de gols que o time que será calculado a probabilidade de ocorrer.
+    return (lambd ** k * exp(-lambd)) / factorial(k)  # Fórmula de Poisson para calcular a probabilidade
 
 # Calcular a probabilidade de gols com base na média de gols
 def calcular_poisson(media_gols):
-    probabilities = [] #Array para armazenar as probabilidades por qtd de gols
-    for k in range(5):  # Calcula para 0, 1, 2, 3, 4 gols
-        probabilidade = poisson_probability(media_gols, k) #Utiliza a média de gols nos últimos jogos e k para calcular para 0, 1, 2, 3 e 4 gols 
-        probabilities.append(probabilidade) #Adiciona a probabilidade na array de probabilidades criada anteriormente
-    return probabilities
+    probabilities = []  # Array para armazenar as probabilidades de cada quantidade de gols
+    for k in range(5):  # Calcula para 0, 1, 2, 3 e 4 gols
+        probabilidade = poisson_probability(media_gols, k)  # Calcula probabilidade para k gols
+        probabilities.append(probabilidade)  # Adiciona a probabilidade ao array
+    return probabilities  # Retorna a lista de probabilidades
 
-class AnalysisApp(QMainWindow): #Classe de criação da janela principal da interface
-    def __init__(self): #Dá inicio a classe
-        super().__init__() #Utilizado super().__init__() para não precisar dar nenhum parâmetro de inicio a classe
-        self.setWindowTitle("Análise Under/Over Gols") #Título da janela do app
-        self.setGeometry(100, 100, 800, 600) #Tamanho da interface
+class AnalysisApp(QMainWindow):  # Classe da janela principal
+    def __init__(self):  # Inicializa a classe
+        super().__init__()  # Inicialização da superclasse QMainWindow
+        self.setWindowTitle("Análise Under/Over Gols")  # Define o título da janela
+        self.setGeometry(100, 100, 800, 600)  # Define o tamanho e posição da janela
 
-        self.df = None #Inicialização do DataFrame na classe
-        self.rodada = None #Inicialização da Rodada utilizada na classe
-        self.teams = [] #Time(s) a ser analisado
+        self.df = None  # Inicialização do DataFrame na classe
+        self.rodada = None  # Inicialização da Rodada utilizada na classe
+        self.teams = []  # Inicialização da lista de times
 
-        layout = QVBoxLayout() #Define um layout disposto em colunas vertiicas
+        layout = QVBoxLayout()  # Define um layout disposto em colunas verticais
 
-        self.btn_load_file = QPushButton("Carregar Arquivo Excel", self) #Botão para adicionar arquivo Excel
-        self.btn_load_file.clicked.connect(self.load_file) #Conecta o evento de clique de botão ao método de load_file
-        layout.addWidget(self.btn_load_file) #Widget para aparecer o botão na interface
+        self.tab_widget = QTabWidget()  # Cria o QTabWidget para abas
+        layout.addWidget(self.tab_widget)  # Adiciona o QTabWidget ao layout principal
 
-        self.label_rodada = QLabel("Informe a rodada (entre 11 e 38):", self) #Label para informar a rodada solicitada
-        layout.addWidget(self.label_rodada) #Widget para aparecer na interface
+        self.analysis_tab = QWidget()  # Cria a aba de análise
+        self.info_tab = QWidget()  # Cria a aba de informações
 
-        self.input_rodada = QLineEdit(self) #Função para editar a rodada solicitada análise
-        layout.addWidget(self.input_rodada) #Widget para aparecer na tela
+        self.tab_widget.addTab(self.analysis_tab, "Análise")  # Adiciona a aba de análise ao QTabWidget
+        self.tab_widget.addTab(self.info_tab, "Informação da Partida")  # Adiciona a aba de informação ao QTabWidget
 
-        self.label_team = QLabel("Selecione um time ou 'Todos' para ver todas as partidas:", self) #Cria um rótulo para guiar o usuário sobre o propósito do campo de seleção.
-        layout.addWidget(self.label_team) #Widget para mostrar na tela
+        self.setup_analysis_tab()  # Configura os widgets da aba de análise
+        self.setup_info_tab()  # Configura os widgets da aba de informação
 
-        self.team_selector = QComboBox(self) #Cria uma caixa de seleção (dropdown) para que o usuário escolha uma opção.
-        self.team_selector.addItem("Todos") #Adiciona a opção "Todos" à lista de opções da caixa de seleção.
-        layout.addWidget(self.team_selector) #Coloca os widgets (rótulo e caixa de seleção) na interface gráfica.
+        container = QWidget()  # Cria um container para o layout principal
+        container.setLayout(layout)  # Define o layout do container
+        self.setCentralWidget(container)  # Define o container como widget central da janela
 
-        self.btn_analyze = QPushButton("Gerar Análise", self) #Botão para gerar análise
-        self.btn_analyze.clicked.connect(self.generate_analysis) #Conecta, ao clicar, o botão a função generate_analysis
-        layout.addWidget(self.btn_analyze) #Adiciona a tela o Widget do botão
+    def setup_analysis_tab(self):  # Método para configurar a aba de análise
+        layout = QVBoxLayout()  # Layout vertical para a aba de análise
+        
+        self.btn_load_file = QPushButton("Carregar Arquivo Excel", self)  # Botão para carregar arquivo
+        self.btn_load_file.clicked.connect(self.load_file)  # Conecta o evento do botão ao método load_file
+        layout.addWidget(self.btn_load_file)  # Adiciona o botão ao layout
 
-        self.table = QTableWidget(self) #Cria uma tabela onde serão exibidos os dados (número de colunas e linhas será definido posteriormente).
-        layout.addWidget(self.table) #Adiciona a tabela a interface, permitindo que ela seja exibida
+        self.label_rodada = QLabel("Informe a rodada (entre 11 e 38):", self)  # Rótulo para rodada
+        layout.addWidget(self.label_rodada)  # Adiciona o rótulo ao layout
 
-        container = QWidget() #Cria um container para os widgets
-        container.setLayout(layout) #Seta o layout criado anteriormente ao container
-        self.setCentralWidget(container) #Centraliza o container, com todos os widgets, na janela principal
+        self.input_rodada = QLineEdit(self)  # Campo de texto para entrada da rodada
+        layout.addWidget(self.input_rodada)  # Adiciona o campo ao layout
 
-    def load_file(self): #Função para carregar arquivo .xlsx
-        options = QFileDialog.Options() #Cria uma variável options que armazena as opções de configuração para a janela de diálogo de seleção de arquivos.
-        file_name, _ = QFileDialog.getOpenFileName(self, "Abrir Arquivo Excel", "", "Excel Files (*.xlsx)", options=options) #Abre uma janela para o usuário selecionar um arquivo Excel (.xlsx). O caminho completo do arquivo selecionado é armazenado na variável file_name. O segundo valor retornado (que não é necessário) é descartado usando _.
-        if file_name: #Verifica se o usuário selecionou um arquivo. Se o caminho do arquivo estiver vazio (o usuário cancelou a operação), o bloco de código dentro do if não será executado.
+        self.label_team = QLabel("Selecione um time ou 'Todos' para ver todas as partidas:", self)  # Rótulo para seleção de time
+        layout.addWidget(self.label_team)  # Adiciona o rótulo ao layout
+
+        self.team_selector = QComboBox(self)  # Caixa de seleção para escolha de time
+        self.team_selector.addItem("Todos")  # Adiciona a opção 'Todos' na lista
+        layout.addWidget(self.team_selector)  # Adiciona a caixa de seleção ao layout
+
+        # Caixa de seleção para marcar como rodada futura
+        self.future_game_checkbox = QCheckBox("Rodada Futura", self)  # Caixa de seleção para indicar se é uma rodada futura
+        self.future_game_checkbox.stateChanged.connect(self.toggle_location_selector)  # Conecta a mudança de estado ao método toggle_location_selector
+        layout.addWidget(self.future_game_checkbox)  # Adiciona a caixa de seleção ao layout
+
+        # Adiciona a caixa de seleção manual de "Casa" ou "Fora"
+        self.label_location = QLabel("Selecione se o time jogará em casa ou fora:", self)  # Rótulo para o local do jogo
+        layout.addWidget(self.label_location)  # Adiciona o rótulo ao layout
+
+        self.location_selector = QComboBox(self)  # Caixa de seleção para escolher entre "Casa" e "Fora"
+        self.location_selector.addItems(["Casa", "Fora"])  # Adiciona as opções "Casa" e "Fora"
+        layout.addWidget(self.location_selector)  # Adiciona a caixa de seleção ao layout
+
+        self.btn_analyze = QPushButton("Gerar Análise", self)  # Botão para gerar análise
+        self.btn_analyze.clicked.connect(self.generate_analysis)  # Conecta o evento do botão ao método generate_analysis
+        layout.addWidget(self.btn_analyze)  # Adiciona o botão ao layout
+
+        self.table = QTableWidget(self)  # Tabela para exibir os dados
+        layout.addWidget(self.table)  # Adiciona a tabela ao layout
+
+        self.analysis_tab.setLayout(layout)  # Define o layout da aba de análise
+
+        # Inicialmente, desabilita a seleção de "Casa" ou "Fora"
+        self.location_selector.setEnabled(False)  # Desabilita a caixa de seleção para "Casa" ou "Fora"
+        self.label_location.setEnabled(False)  # Desabilita o rótulo associado
+
+    def toggle_location_selector(self):  # Método para habilitar/desabilitar a seleção de "Casa/Fora"
+        # Habilita ou desabilita a seleção "Casa/Fora" dependendo da caixa de seleção de rodada futura
+        is_future = self.future_game_checkbox.isChecked()  # Verifica se a caixa de seleção de rodada futura está marcada
+        self.location_selector.setEnabled(is_future)  # Habilita a seleção de "Casa" ou "Fora" se for uma rodada futura
+        self.label_location.setEnabled(is_future)  # Habilita o rótulo associado
+
+    def setup_info_tab(self):  # Método para configurar a aba de informação
+        layout = QVBoxLayout()  # Layout vertical para a aba de informação
+        self.info_text = QTextEdit()  # Texto para exibir status de casa/fora
+        self.info_text.setReadOnly(True)  # Define o campo como apenas leitura
+        layout.addWidget(self.info_text)  # Adiciona o campo de texto ao layout
+        self.info_tab.setLayout(layout)  # Define o layout da aba de informação
+
+    def load_file(self):  # Função para carregar arquivo .xlsx
+        options = QFileDialog.Options()  # Opções de configuração para a janela de diálogo
+        file_name, _ = QFileDialog.getOpenFileName(self, "Abrir Arquivo Excel", "", "Excel Files (*.xlsx)", options=options)  # Abre a janela para seleção de arquivo
+        if file_name:  # Verifica se um arquivo foi selecionado
             try:
-                self.df = pd.read_excel(file_name) #Lê o arquivo Excel selecionado e armazena os dados em um DataFrame do pandas, que é acessível através do atributo self.df. Isso carrega o conteúdo do arquivo para a aplicação.
-                self.teams = sorted(set(self.df['Casa - Time'].unique()).union(set(self.df['Fora - Time'].unique()))) #Extrai todos os times de forma única que estão no arquivo, na coluna 'Casa - Time' e 'Fora - Time'
-                self.team_selector.addItems(self.teams) #Adiciona os times ao team_selector do layout principal
-                QMessageBox.information(self, "Sucesso", "Arquivo carregado com sucesso!") #Ao concluir o carregamento do arquivo, apresenta a mensagem de sucesso.
+                self.df = pd.read_excel(file_name)  # Lê o arquivo Excel e armazena em self.df
+                self.teams = sorted(set(self.df['Casa - Time'].unique()).union(set(self.df['Fora - Time'].unique())))  # Extrai todos os times únicos
+                self.team_selector.addItems(self.teams)  # Adiciona os times à lista de seleção
+                QMessageBox.information(self, "Sucesso", "Arquivo carregado com sucesso!")  # Exibe mensagem de sucesso
             except Exception as e:
-                QMessageBox.critical(self, "Erro", f"Erro ao carregar o arquivo: {e}") #Caso ocorra algum erro no Try/Except, apresenta o erro.
+                QMessageBox.critical(self, "Erro", f"Erro ao carregar o arquivo: {e}")  # Exibe mensagem de erro
 
-    def generate_analysis(self): #Função para gerar análise
-        if self.df is None: #Se o DataFrame estiver vazio, solicitá que importe um arquivo primeiro.
-            QMessageBox.warning(self, "Aviso", "Por favor, carregue um arquivo primeiro.")
+    def generate_analysis(self):  # Função para gerar análise
+        if self.df is None:  # Verifica se o DataFrame está vazio
+            QMessageBox.warning(self, "Aviso", "Por favor, carregue um arquivo primeiro.")  # Exibe aviso
             return
 
         try:
-            self.rodada = int(self.input_rodada.text()) #Adiciona a rodada a classe AnalysisApp criada anteriormente
-            if self.rodada < 11 or self.rodada > 38: #Verifica se a rodada seleciona atende os requisitos da 11 a 38 
+            self.rodada = int(self.input_rodada.text())  # Converte a rodada para inteiro
+            if self.rodada < 11 or self.rodada > 38:  # Verifica se a rodada está entre 11 e 38
                 raise ValueError
         except ValueError:
-            QMessageBox.critical(self, "Erro", "Rodada inválida. Insira um número entre 11 e 38.") #Apresenta um erro caso não atenda os requisitos.
+            QMessageBox.critical(self, "Erro", "Rodada inválida. Insira um número entre 11 e 38.")  # Exibe erro de rodada inválida
             return
 
-        selected_team = self.team_selector.currentText() #Adiciona o time selecionado a classe AnalysisApp criada anteriomente.
+        selected_team = self.team_selector.currentText()  # Obtém o time selecionado
+
+        # Verifica se é uma rodada futura
+        is_future = self.future_game_checkbox.isChecked()  # Verifica se a rodada é marcada como futura
 
         if selected_team == "Todos":
-            df_filtered = self.df[self.df['Partida'] == self.rodada]
+            df_filtered = self.df[self.df['Partida'] == self.rodada]  # Filtra para mostrar todas as partidas da rodada
+            self.info_text.setText("Exibindo todas as partidas da rodada.")  # Exibe mensagem na aba de informação
+        elif is_future:
+            # Usa seleção manual de "Casa" ou "Fora" para rodadas futuras
+            location = self.location_selector.currentText()  # Obtém a seleção manual "Casa" ou "Fora"
+            self.info_text.setText(f"{selected_team} jogará '{location}' na rodada {self.rodada} (configurado manualmente).")
+            home_or_away = location
+            df_filtered = self.df[(self.df[f"{home_or_away} - Time"] == selected_team) & (self.df['Partida'] < self.rodada)].tail(5)  # Filtra as últimas 5 partidas com base na seleção manual
         else:
-            rodada_atual = self.df[self.df['Partida'] == self.rodada]
-            if rodada_atual.empty:
-                QMessageBox.information(self, "Sem Dados", "Nenhuma partida encontrada para a rodada especificada.")
-                return
-
+            rodada_atual = self.df[self.df['Partida'] == self.rodada]  # Filtra para a rodada especificada
             if not rodada_atual[rodada_atual['Casa - Time'] == selected_team].empty:
                 df_filtered = self.df[(self.df['Casa - Time'] == selected_team) & (self.df['Partida'] < self.rodada)].tail(5)
                 home_or_away = 'Casa'
+                self.info_text.setText(f"{selected_team} jogará em casa na rodada {self.rodada}.")
             elif not rodada_atual[rodada_atual['Fora - Time'] == selected_team].empty:
                 df_filtered = self.df[(self.df['Fora - Time'] == selected_team) & (self.df['Partida'] < self.rodada)].tail(5)
                 home_or_away = 'Fora'
+                self.info_text.setText(f"{selected_team} jogará fora na rodada {self.rodada}.")
             else:
-                QMessageBox.information(self, "Sem Dados", "Time não encontrado na rodada especificada.")
+                self.info_text.setText("Time não encontrado na rodada especificada.")
                 return
 
         if df_filtered.empty:
-            QMessageBox.information(self, "Sem Dados", "Nenhuma partida encontrada para os critérios especificados.")
+            QMessageBox.information(self, "Sem Dados", "Nenhuma partida encontrada para os critérios especificados.")  # Exibe mensagem se não há partidas
             return
 
-        self.display_table(df_filtered)
+        self.display_table(df_filtered)  # Exibe a tabela com os dados filtrados
 
-        # Cálculo da média de gols sofridos pelo adversário
         if home_or_away == 'Casa':
-            adversary_goals = df_filtered['Fora - Gols']
+            adversary_goals = df_filtered['Fora - Gols']  # Define os gols do adversário para partidas em casa
         else:
-            adversary_goals = df_filtered['Casa - Gols']
+            adversary_goals = df_filtered['Casa - Gols']  # Define os gols do adversário para partidas fora
 
-        adversary_goals = adversary_goals.dropna()
+        adversary_goals = adversary_goals.dropna()  # Remove valores nulos
         if adversary_goals.empty:
-            QMessageBox.critical(self, "Erro", "Não há dados suficientes para calcular a média de gols sofridos pelo adversário.")
+            QMessageBox.critical(self, "Erro", "Não há dados suficientes para calcular a média de gols sofridos pelo adversário.")  # Exibe erro se não há dados suficientes
             return
 
-        media_gols = adversary_goals.mean()
-
-        #Geração Gráfico de gols marcados pelo time analisado
-        self.plot_goals_distribution(df_filtered, selected_team, home_or_away)
-        # Geração do gráfico de Poisson
-        self.plot_poisson_distribution(selected_team, media_gols)
+        media_gols = adversary_goals.mean()  # Calcula a média de gols sofridos
+        self.plot_goals_distribution(df_filtered, selected_team, home_or_away)  # Gera gráfico de distribuição de gols
+        self.plot_poisson_distribution(selected_team, media_gols)  # Gera gráfico de Poisson
 
     def plot_goals_distribution(self, df_filtered, selected_team, home_or_away):
         plt.figure(figsize=(10, 5))
-        bar_width = 0.6  # Define a largura das barras para criar mais espaçamento
+        bar_width = 0.6
 
         if home_or_away == 'Casa':
             df_filtered['Casa - Gols'].plot(kind='hist', bins=range(0, df_filtered['Casa - Gols'].max() + 2), 
@@ -148,7 +197,7 @@ class AnalysisApp(QMainWindow): #Classe de criação da janela principal da inte
         plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
         plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
         plt.ylabel("Frequência (Número de Partidas)")
-        plt.grid(axis='y', linestyle='--', alpha=0.5)  # Adiciona linhas de grade leves para melhorar a visualização
+        plt.grid(axis='y', linestyle='--', alpha=0.5)
         plt.show()
 
     def plot_poisson_distribution(self, selected_team, media_gols):
@@ -176,7 +225,7 @@ class AnalysisApp(QMainWindow): #Classe de criação da janela principal da inte
         self.table.setHorizontalHeaderLabels(df_filtered.columns)
 
         for i in range(df_filtered.shape[0]):
-            for j in range(df_filtered.shape[1]):
+            for j in range(df_filtered.shape[1]): 
                 self.table.setItem(i, j, QTableWidgetItem(str(df_filtered.iat[i, j])))
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
